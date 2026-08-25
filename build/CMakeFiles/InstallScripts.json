@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/richn/richardlab/powerup_sim/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

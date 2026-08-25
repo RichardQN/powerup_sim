@@ -1,0 +1,3 @@
+/home/richn/richardlab/powerup_sim/build/CMakeFiles/sim.dir
+/home/richn/richardlab/powerup_sim/build/CMakeFiles/edit_cache.dir
+/home/richn/richardlab/powerup_sim/build/CMakeFiles/rebuild_cache.dir
