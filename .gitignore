@@ -1,2 +1,11 @@
-#executables
-main.exe
+# Build directories
+build/
+cmake-build-*/
+out/
+
+# Executables
+*.exe
+sim
+
+# Editor files
+.vscode/
