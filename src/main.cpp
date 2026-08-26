@@ -1,70 +1,91 @@
-// src/main.cpp
+#define GLFW_INCLUDE_NONE
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+
 #include <iostream>
 
-void errorCallback(int code, const char* description) {
-    std::cerr << "GLFW Error [" << code << "]: " << description << "\n";
+void errorCallback(int errorCode, const char* description)
+{
+    std::cerr << "GLFW error [" << errorCode << "]: "
+              << description << '\n';
 }
 
-int main() {
-    glfwSetErrorCallback(errorCallback);   // add this before glfwInit()
+void framebufferSizeCallback(GLFWwindow*, int width, int height)
+{
+    glViewport(0, 0, width, height);
+}
 
-    glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);  // force X11, don't rely on env vars
-
-    if (!glfwInit()) {
-        std::cerr << "Failed to init GLFW\n";
-        return -1;
+void processInput(GLFWwindow* window)
+{
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
-    // 1. Init GLFW
-    if (!glfwInit()) {
-        std::cerr << "Failed to init GLFW\n";
-        return -1;
+}
+
+int main()
+{
+    glfwSetErrorCallback(errorCallback);
+
+    if (glfwInit() != GLFW_TRUE) {
+        std::cerr << "Failed to initialize GLFW\n";
+        return 1;
     }
 
-    // 2. Tell GLFW what GL version/profile you want (match what you picked in GLAD)
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+    // Start with a widely supported version.
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    // 3. Create the window (this also creates the GL context, but doesn't make it current yet)
-    GLFWwindow* window = glfwCreateWindow(800, 600, "My Engine", nullptr, nullptr);
-    if (!window) {
+    GLFWwindow* window =
+        glfwCreateWindow(800, 600, "Powerup Simulator", nullptr, nullptr);
+
+    if (window == nullptr) {
         std::cerr << "Failed to create GLFW window\n";
         glfwTerminate();
-        return -1;
+        return 1;
     }
 
-    // 4. Make the context current on this thread
     glfwMakeContextCurrent(window);
 
-    // 5. NOW load GLAD — must happen after a context exists and is current
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+    if (gladLoadGLLoader(
+            reinterpret_cast<GLADloadproc>(glfwGetProcAddress)) == 0) {
         std::cerr << "Failed to initialize GLAD\n";
-        return -1;
+        glfwDestroyWindow(window);
+        glfwTerminate();
+        return 1;
     }
 
-    // (optional) confirm it worked
-    std::cout << "OpenGL version: " << glGetString(GL_VERSION) << "\n";
+    glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 
-    // 6. Set the viewport to match window size
-    glViewport(0, 0, 800, 600);
+    int framebufferWidth = 0;
+    int framebufferHeight = 0;
+    glfwGetFramebufferSize(
+        window,
+        &framebufferWidth,
+        &framebufferHeight
+    );
+    glViewport(0, 0, framebufferWidth, framebufferHeight);
 
-    // 7. Main loop
-    while (!glfwWindowShouldClose(window)) {
-        // input handling would go here
+    // Enable vertical synchronization.
+    glfwSwapInterval(1);
 
-        // clear the screen
-        glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
+    std::cout << "OpenGL version: "
+              << reinterpret_cast<const char*>(glGetString(GL_VERSION))
+              << '\n';
+
+    while (glfwWindowShouldClose(window) == GLFW_FALSE) {
+        processInput(window);
+
+        glClearColor(0.05f, 0.02f, 0.12f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        // rendering goes here (nothing to draw yet)
-
-        glfwSwapBuffers(window);   // present the frame
-        glfwPollEvents();          // handle window/input events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
     }
 
-    // 8. Cleanup
+    glfwDestroyWindow(window);
     glfwTerminate();
+
     return 0;
 }
