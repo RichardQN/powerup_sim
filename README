@@ -1,3 +1,59 @@
-Initial Commit: 
+Powerup Simulator
+=================
 
-POWERUP! 
+A C++17/OpenGL learning project. The current milestone draws a colored
+triangle on a purple background using GLFW and the bundled GLAD 1 loader.
+It requests an OpenGL 3.3 core context and uses GLSL 330 shaders.
+
+Build and run (from the repository root)
+----------------------------------------
+
+Requires CMake, a C/C++ compiler, GLFW development files, OpenGL development
+files, and a working graphical session. No new dependencies were added.
+
+    cmake -S . -B build
+    cmake --build build -j2
+    ./build/sim
+
+Configuration generates build instructions; compilation builds the sim
+executable. The existing build directory uses Unix Makefiles; keep its
+generator when reconfiguring. Shader sources are embedded in src/main.cpp,
+so shader edits require a rebuild. Startup prints vendor, renderer, and
+OpenGL version; shader errors go to standard error and cause exit status 1.
+
+Controls and manual checks
+--------------------------
+
+- Expect a triangle with red, green, and blue corners and interpolated
+  colors inside, on a dark purple background.
+- Resize the window: the viewport should fill the framebuffer and the
+  triangle should remain centered. Its proportions change with the window
+  aspect ratio at this milestone; no camera or projection is present yet.
+- Press Escape to exit. Relaunch and check the window's close button too.
+- Minimize and restore the window and confirm rendering resumes.
+
+See PROGRESS.md for verification results and graphics environment details.
+
+How the triangle works
+----------------------
+
+Initialization compiles two shaders and links their program, then copies
+three vertices from CPU memory into a VBO. Each vertex has six floats:
+x, y, z, red, green, blue. The VAO records two attributes with a stride of
+6 * sizeof(float) bytes; color begins at 3 * sizeof(float) bytes.
+
+Each frame clears the background, binds the program and VAO, and draws
+three vertices. The vertex shader writes clip-space positions with w = 1.
+The rasterizer interpolates vertex colors, and the fragment shader writes
+those colors. Buffers, the VAO, and the program are released while the
+OpenGL context still exists.
+
+Exercise (10-20 minutes)
+-----------------------
+
+Predict what moving the top vertex to x = 0.3 will do, make the change in
+the vertices array, and rebuild. Then change the three RGB colors and
+compare the resulting gradient with your prediction.
+
+1. Why is the stride six floats, while the color offset is three floats?
+2. How do three vertex colors produce many colors inside the triangle?

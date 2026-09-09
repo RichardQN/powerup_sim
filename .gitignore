@@ -9,3 +9,8 @@ sim
 
 # Editor files
 .vscode/
+
+# agent files
+POWERUP_SIM_CODEX_PLAN.md
+PROGRESS.md
+
