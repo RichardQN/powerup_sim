@@ -18,3 +18,10 @@ target_include_directories(sim PRIVATE
 )
 
 target_link_libraries(sim PRIVATE glfw OpenGL::GL)
+
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(scene_math_test tests/scene_math_test.cpp)
+    target_include_directories(scene_math_test PRIVATE src)
+    add_test(NAME scene_math COMMAND scene_math_test)
+endif()

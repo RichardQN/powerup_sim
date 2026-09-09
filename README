@@ -1,59 +1,83 @@
 Powerup Simulator
 =================
 
-A C++17/OpenGL learning project. The current milestone draws a colored
-triangle on a purple background using GLFW and the bundled GLAD 1 loader.
-It requests an OpenGL 3.3 core context and uses GLSL 330 shaders.
+A C++17/OpenGL learning project. Milestone 2 renders a blue cube on an 8x8
+world-unit ground plane with a perspective orbit camera and depth testing.
+GLFW creates the window; bundled GLAD 1 loads OpenGL. The context requests
+OpenGL 3.3 core and the shaders use GLSL 330. Face colors suggest shape;
+there is no lighting system yet.
 
 Build and run (from the repository root)
 ----------------------------------------
 
 Requires CMake, a C/C++ compiler, GLFW development files, OpenGL development
-files, and a working graphical session. No new dependencies were added.
+files, and a working graphical session. No new external dependencies.
 
     cmake -S . -B build
     cmake --build build -j2
+    ctest --test-dir build --output-on-failure
     ./build/sim
 
-Configuration generates build instructions; compilation builds the sim
-executable. The existing build directory uses Unix Makefiles; keep its
-generator when reconfiguring. Shader sources are embedded in src/main.cpp,
-so shader edits require a rebuild. Startup prints vendor, renderer, and
-OpenGL version; shader errors go to standard error and cause exit status 1.
+Configuration generates build instructions; compilation builds sim and the
+small scene math test. The existing build directory uses Unix Makefiles;
+keep its generator when reconfiguring. Shader sources live in src/main.cpp,
+so shader edits require rebuilding. Startup prints the vendor, renderer,
+OpenGL version, and controls. Compilation/link failures print shader logs
+and exit with status 1. No graphics environment override is required by
+our successful checks; see PROGRESS.md for WSL startup observations.
 
 Controls and manual checks
 --------------------------
 
-- Expect a triangle with red, green, and blue corners and interpolated
-  colors inside, on a dark purple background.
-- Resize the window: the viewport should fill the framebuffer and the
-  triangle should remain centered. Its proportions change with the window
-  aspect ratio at this milestone; no camera or projection is present yet.
-- Press Escape to exit. Relaunch and check the window's close button too.
-- Minimize and restore the window and confirm rendering resumes.
+- Left/right arrows: orbit horizontally. Up/down: change elevation.
+- + or =: zoom in. -: zoom out. Keypad +/- also work.
+- R: reset camera. Escape or window close button: exit.
+- The window must have keyboard focus. Hold keys for continuous movement.
+- Orbit around the cube and confirm nearer faces hide farther faces.
+  The ground is drawn after the cube; depth testing keeps it behind the cube.
+- Zoom to both limits (2.5 and 15 world units from the target). Elevation
+  stays between 0.1 and 1.45 radians, keeping the camera above the ground.
+- Resize to a tall and then a wide window: the cube should keep its
+  proportions. Minimize/restore and confirm rendering resumes normally.
 
-See PROGRESS.md for verification results and graphics environment details.
+How the stage works
+-------------------
 
-How the triangle works
-----------------------
+The VBO stores 36 cube vertices followed by 6 ground vertices. Each vertex
+has six floats: x, y, z, red, green, blue. The VAO records a six-float stride
+and a three-float color offset, both expressed in bytes. One shader program
+and one VAO/VBO serve both objects, with two draw calls per frame.
 
-Initialization compiles two shaders and links their program, then copies
-three vertices from CPU memory into a VBO. Each vertex has six floats:
-x, y, z, red, green, blue. The VAO records two attributes with a stride of
-6 * sizeof(float) bytes; color begins at 3 * sizeof(float) bytes.
+The unit cube starts centered at the origin in object coordinates. Its
+model matrix translates it up by 0.5 so its bottom rests at world y = 0.
+The ground uses an identity model transform. The view matrix places the
+world relative to a camera looking at (0, 0.5, 0). The projection matrix
+uses a 45-degree vertical field of view and the current framebuffer aspect
+ratio, with near/far clipping distances of 0.1 and 50 world units.
 
-Each frame clears the background, binds the program and VAO, and draws
-three vertices. The vertex shader writes clip-space positions with w = 1.
-The rasterizer interpolates vertex colors, and the fragment shader writes
-those colors. Buffers, the VAO, and the program are released while the
-OpenGL context still exists.
+In the vertex shader, projection * view * model * position applies these
+transforms from right to left. src/scene_math.h contains only the vector
+and matrix operations needed here, using column-major storage and a
+right-handed world with +Y up. Its CPU-only tests check translation, view
+orientation, near/far depth mapping, and aspect correction.
+
+Each frame processes events, moves the camera using elapsed seconds,
+clears color and depth, uploads transforms, and draws. Camera motion caps
+elapsed time at 0.1 seconds to discard a large jump after a stall. If either
+framebuffer dimension is zero, projection and drawing are skipped while
+event handling continues. GPU resources are deleted before the context.
 
 Exercise (10-20 minutes)
 -----------------------
 
-Predict what moving the top vertex to x = 0.3 will do, make the change in
-the vertices array, and rebuild. Then change the three RGB colors and
-compare the resulting gradient with your prediction.
+Make the cube hover by changing cubeModel's y translation from 0.5f to:
 
-1. Why is the stride six floats, while the color offset is three floats?
-2. How do three vertex colors produce many colors inside the triangle?
+    0.75f + 0.25f * std::sin(static_cast<float>(currentTime) * 2.0f)
+
+Predict its minimum/maximum bottom height and its period before rebuilding.
+The constant 2.0 is angular speed in radians per second. Keep the ground
+and camera target fixed while trying the change.
+
+1. Why does hovering belong in the cube's model matrix instead of the view?
+2. Why must the projection use framebuffer width/height, and why must the
+   depth buffer be cleared every frame?

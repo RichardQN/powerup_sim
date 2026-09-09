@@ -3,6 +3,9 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#include "scene_math.h"
+
+#include <algorithm>
 #include <iostream>
 #include <vector>
 
@@ -38,11 +41,36 @@ void framebufferSizeCallback(GLFWwindow*, int width, int height)
     glViewport(0, 0, width, height);
 }
 
-void processInput(GLFWwindow* window)
+struct OrbitCamera {
+    // Angles are radians; distance and positions are in world units.
+    float yaw = 0.65f;
+    float pitch = 0.45f;
+    float distance = 6.0f;
+
+    Vec3 eye() const
+    {
+        return {distance * std::cos(pitch) * std::sin(yaw),
+                0.5f + distance * std::sin(pitch),
+                distance * std::cos(pitch) * std::cos(yaw)};
+    }
+};
+
+void processInput(GLFWwindow* window, OrbitCamera& camera, float elapsedSeconds)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
+    auto held = [window](int key) { return glfwGetKey(window, key) == GLFW_PRESS; };
+    // Orbit at 1.2 radians/second and zoom at 3 world units/second.
+    camera.yaw += (held(GLFW_KEY_RIGHT) - held(GLFW_KEY_LEFT)) * 1.2f * elapsedSeconds;
+    camera.pitch += (held(GLFW_KEY_UP) - held(GLFW_KEY_DOWN)) * 1.2f * elapsedSeconds;
+    bool zoomIn = held(GLFW_KEY_EQUAL) || held(GLFW_KEY_KP_ADD);
+    bool zoomOut = held(GLFW_KEY_MINUS) || held(GLFW_KEY_KP_SUBTRACT);
+    camera.distance += (zoomOut - zoomIn) * 3.0f * elapsedSeconds;
+    camera.yaw = std::remainder(camera.yaw, 6.283185307f);
+    camera.pitch = std::clamp(camera.pitch, 0.1f, 1.45f);
+    camera.distance = std::clamp(camera.distance, 2.5f, 15.0f);
+    if (held(GLFW_KEY_R)) camera = OrbitCamera{};
 }
 
 int main()
@@ -107,10 +135,14 @@ int main()
 layout (location = 0) in vec3 position;
 layout (location = 1) in vec3 color;
 out vec3 vertexColor;
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
 
 void main()
 {
-    gl_Position = vec4(position, 1.0);
+    // Apply object -> world -> camera -> clip transforms, right to left.
+    gl_Position = projection * view * model * vec4(position, 1.0);
     vertexColor = color;
 }
 )glsl";
@@ -158,13 +190,58 @@ void main()
         return 1;
     }
 
-    // Each vertex has three clip-space coordinates followed by three RGB values.
-    // With w = 1, the visible x/y range is -1 to +1, independent of window pixels.
+    // One unit cube (36 vertices), then an 8x8 ground plane (6 vertices).
+    // Positions are object-space world units; each vertex still has XYZ + RGB.
     const float vertices[] = {
-        // x      y     z       red   green blue
-        -0.6f, -0.5f, 0.0f,    1.0f, 0.2f, 0.2f,
-         0.6f, -0.5f, 0.0f,    0.2f, 1.0f, 0.2f,
-         0.0f,  0.6f, 0.0f,    0.2f, 0.4f, 1.0f,
+        // Front
+        -0.50f, -0.50f, 0.50f, 0.20f, 0.65f, 1.00f,
+        0.50f, -0.50f, 0.50f, 0.20f, 0.65f, 1.00f,
+        0.50f, 0.50f, 0.50f, 0.20f, 0.65f, 1.00f,
+        -0.50f, -0.50f, 0.50f, 0.20f, 0.65f, 1.00f,
+        0.50f, 0.50f, 0.50f, 0.20f, 0.65f, 1.00f,
+        -0.50f, 0.50f, 0.50f, 0.20f, 0.65f, 1.00f,
+        // Back
+        0.50f, -0.50f, -0.50f, 0.15f, 0.40f, 0.70f,
+        -0.50f, -0.50f, -0.50f, 0.15f, 0.40f, 0.70f,
+        -0.50f, 0.50f, -0.50f, 0.15f, 0.40f, 0.70f,
+        0.50f, -0.50f, -0.50f, 0.15f, 0.40f, 0.70f,
+        -0.50f, 0.50f, -0.50f, 0.15f, 0.40f, 0.70f,
+        0.50f, 0.50f, -0.50f, 0.15f, 0.40f, 0.70f,
+        // Right
+        0.50f, -0.50f, 0.50f, 0.15f, 0.50f, 0.85f,
+        0.50f, -0.50f, -0.50f, 0.15f, 0.50f, 0.85f,
+        0.50f, 0.50f, -0.50f, 0.15f, 0.50f, 0.85f,
+        0.50f, -0.50f, 0.50f, 0.15f, 0.50f, 0.85f,
+        0.50f, 0.50f, -0.50f, 0.15f, 0.50f, 0.85f,
+        0.50f, 0.50f, 0.50f, 0.15f, 0.50f, 0.85f,
+        // Left
+        -0.50f, -0.50f, -0.50f, 0.10f, 0.35f, 0.60f,
+        -0.50f, -0.50f, 0.50f, 0.10f, 0.35f, 0.60f,
+        -0.50f, 0.50f, 0.50f, 0.10f, 0.35f, 0.60f,
+        -0.50f, -0.50f, -0.50f, 0.10f, 0.35f, 0.60f,
+        -0.50f, 0.50f, 0.50f, 0.10f, 0.35f, 0.60f,
+        -0.50f, 0.50f, -0.50f, 0.10f, 0.35f, 0.60f,
+        // Top
+        -0.50f, 0.50f, 0.50f, 0.45f, 0.80f, 1.00f,
+        0.50f, 0.50f, 0.50f, 0.45f, 0.80f, 1.00f,
+        0.50f, 0.50f, -0.50f, 0.45f, 0.80f, 1.00f,
+        -0.50f, 0.50f, 0.50f, 0.45f, 0.80f, 1.00f,
+        0.50f, 0.50f, -0.50f, 0.45f, 0.80f, 1.00f,
+        -0.50f, 0.50f, -0.50f, 0.45f, 0.80f, 1.00f,
+        // Bottom
+        -0.50f, -0.50f, -0.50f, 0.10f, 0.25f, 0.45f,
+        0.50f, -0.50f, -0.50f, 0.10f, 0.25f, 0.45f,
+        0.50f, -0.50f, 0.50f, 0.10f, 0.25f, 0.45f,
+        -0.50f, -0.50f, -0.50f, 0.10f, 0.25f, 0.45f,
+        0.50f, -0.50f, 0.50f, 0.10f, 0.25f, 0.45f,
+        -0.50f, -0.50f, 0.50f, 0.10f, 0.25f, 0.45f,
+        // Ground plane
+        -4.00f, 0.00f, -4.00f, 0.23f, 0.27f, 0.32f,
+        -4.00f, 0.00f, 4.00f, 0.23f, 0.27f, 0.32f,
+        4.00f, 0.00f, 4.00f, 0.23f, 0.27f, 0.32f,
+        -4.00f, 0.00f, -4.00f, 0.23f, 0.27f, 0.32f,
+        4.00f, 0.00f, 4.00f, 0.23f, 0.27f, 0.32f,
+        4.00f, 0.00f, -4.00f, 0.23f, 0.27f, 0.32f,
     };
 
     GLuint vertexArray = 0;
@@ -184,18 +261,51 @@ void main()
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+    const GLint modelLocation = glGetUniformLocation(program, "model");
+    const GLint viewLocation = glGetUniformLocation(program, "view");
+    const GLint projectionLocation = glGetUniformLocation(program, "projection");
+    glEnable(GL_DEPTH_TEST);
+    OrbitCamera camera;
+    double previousTime = glfwGetTime();
+    std::cout << "Arrow keys: orbit | +/-: zoom | R: reset camera | Escape: quit\n";
+
     while (glfwWindowShouldClose(window) == GLFW_FALSE) {
-        processInput(window);
+        glfwPollEvents();
+        double currentTime = glfwGetTime();
+        // Discard time beyond 100 ms after a stall to avoid a large camera jump.
+        float elapsedSeconds = static_cast<float>(std::clamp(currentTime - previousTime, 0.0, 0.1));
+        previousTime = currentTime;
+        processInput(window, camera, elapsedSeconds);
+        if (glfwWindowShouldClose(window)) break;
+
+        glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
+        if (framebufferWidth == 0 || framebufferHeight == 0) {
+            glfwWaitEventsTimeout(0.05);
+            continue;
+        }
+        Mat4 view = lookAt(camera.eye(), {0, 0.5f, 0});
+        Mat4 projection = perspective(0.785398163f,
+            static_cast<float>(framebufferWidth) / framebufferHeight, 0.1f, 50.0f);
 
         glClearColor(0.05f, 0.02f, 0.12f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glUseProgram(program);
         glBindVertexArray(vertexArray);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glUniformMatrix4fv(viewLocation, 1, GL_FALSE, view.values);
+        glUniformMatrix4fv(projectionLocation, 1, GL_FALSE, projection.values);
+
+        // Lift the cube's center so its bottom rests on the ground at y = 0.
+        Mat4 cubeModel = translation({0, 0.5f, 0});
+        glUniformMatrix4fv(modelLocation, 1, GL_FALSE, cubeModel.values);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+
+        // Draw ground second: depth testing keeps it from covering the cube.
+        Mat4 groundModel = translation({0, 0, 0});
+        glUniformMatrix4fv(modelLocation, 1, GL_FALSE, groundModel.values);
+        glDrawArrays(GL_TRIANGLES, 36, 6);
 
         glfwSwapBuffers(window);
-        glfwPollEvents();
     }
 
     // GPU resources belong to this context, so release them before the window.
