@@ -1,6 +1,10 @@
 Powerup Simulator
 =================
 
+Learning guide: docs/first-two-steps.md briefly covers setup, then explains
+the triangle and 3D stage with concrete examples and three core exercises
+plus an optional stretch exercise for each of those two milestones.
+
 A C++17/OpenGL learning project. Milestone 2 renders a blue cube on an 8x8
 world-unit ground plane with a perspective orbit camera and depth testing.
 GLFW creates the window; bundled GLAD 1 loads OpenGL. The context requests
